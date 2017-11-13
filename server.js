@@ -3,77 +3,92 @@ var fs = require('fs');
 var request = require('request');
 var cheerio = require('cheerio');
 var app = express();
-var teams = require('./teams');
+var endpoints = require('./endpoints');
+
+var teams = endpoints.teams;
 
 var baseUrl = 'https://www.basketball-reference.com/';
 
+// replace with dateTime function
+var currentSeason = '2018';
 
-app.get('/scrape/teams', function(req, res){
-  url = baseUrl + 'teams/' + 'POR';
-  console.log(url);
+var team = 'POR';
 
-  request(url, function(error, response, html){
-    if(!error){
-      console.log('testt');
-      var $ = cheerio.load(html);
-      var name;
-      var json = { name: "" };
 
-      $('#meta').filter(function(){
-        var data = $(this);
-        name = data.children().last().children().first().children().first().text();
-        json.name = name;
-      })
+app.get('/scrape/teams/' + team, function(req, res){
+  teamUrl = baseUrl + 'teams/' + team + '/' + currentSeason + '.html';
+  console.log(teamUrl);
+  var json = {
+    team: {
+      season: "",
+      name: "",
+      wins: "",
+      losses: "",
+      players: {
+
+      }
     }
-    
+  };
 
-    fs.writeFile('teams.json', JSON.stringify(json, null, 4), function(err){
-      console.log('Teams written to output.json!');
-    })
-
-    res.send('Check your console!!');
-  })
-})
-
-
-
-app.get('/scrape', function(req, res){
-
-  url = 'https://www.basketball-reference.com/players/s/swanica01.html';
-
-      testurl = baseUrl + 'teams/' + 'POR';
-      console.log(testurl);
-
-  request(url, function(error, response, html){
-
+  request(teamUrl, function(error, response, html){
     if(!error){
       var $ = cheerio.load(html);
 
-      var name, number;
-      var json = { name: "", number: "" };
-
+      // team
       $('#meta').filter(function(){
         var data = $(this);
-        name = data.children().last().children().first().text();
-        json.name = name;
+
+        // grab from DOM
+        var season = data.children().last().children().first().children().first().text();
+        var name = data.children().last().children().first().children().eq(1).text();
+
+        // write as JSON
+        json.team['name'] = name;
+        json.team['season'] = season;
       })
 
-      $('.uni_holder').filter(function(){
+      // players
+      $('.stats_table').filter(function(){
         var data = $(this);
-        number = data.children().first().children().first().children().last().text();
-        json.number = number;
+
+        // grab from DOM
+        var playersTable = data.children().last().children();
+
+        // write as JSON
+        for(let i = 0; i < playersTable.length; i++) {
+          let number = playersTable.eq(i).children().first().text();
+          let name = playersTable.eq(i).children().eq(1).children().first().text();
+          let position = playersTable.eq(i).children().eq(2).text();
+          console.log(number);
+          json.team.players[number] = {
+            number: number,
+            name: name,
+            position: position
+          }
+        }
       })
+
+      $('#team_misc').filter(function(){
+        var data = $(this);
+        console.log(data.children().last().children().first().children().eq(1));
+
+        // var wins = data.children().last().children().first().children().eq(1).text();
+        // var losses = data.children().last().children().first().children().eq(2).text();
+        //
+        // console.log(wins + '/' + losses);
+        //
+        // json.team['wins'] = wins;
+        // json.team['losses'] = losses;
+      })
+
     }
 
-    fs.writeFile('output.json', JSON.stringify(json, null, 4), function(err){
-      console.log('File successfully written! - Check your project directory for the output.json file');
+    fs.writeFile('team.json', JSON.stringify(json, null, 4), function(err){
+      console.log('Team written to team.json!');
     })
 
-    res.send('Check your console!')
-    console.log(json.name);
-    console.log(teams.teams.length);
+    res.send('Woo!!');
   })
-
 })
 
 app.listen('8081')
